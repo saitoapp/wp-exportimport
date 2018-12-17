@@ -273,6 +273,7 @@ program
           }
 
           // Get admins
+          /*
           group.getAllAdmins(g.id, "")
             .then(admins => {
               //console.log('Admin for group ' + g.id + ' are ' + JSON.stringify(admins));
@@ -282,6 +283,7 @@ program
                 //console.log('SUCCESS exporting groups admins to folder ' + exportname);
               });
             });
+            */
           // Get members
           group.getAllMembers(g.id, "")
             .then(members => {
