@@ -22,6 +22,19 @@ module.exports = {
     return member.getEdgeMembers(url, fields);
   },
 
+  "createNewGroup": function createNewGroup(group) {
+    let url = graphAPIUrl + "community/groups";
+    let qs = {
+      "name": group.name,
+      "privacy": group.privacy,
+      "group_type": group.purpose,
+    };
+    if (group.description){
+      qs.description = group.description;
+    }
+    return rp(common.createPostOptions(url,qs));
+  },
+  /*
   "createNewGroup": function createNewGroup(name, description, privacy, cover_url) {
     let url = graphAPIUrl + "community/groups";
     let qs = {
@@ -32,6 +45,7 @@ module.exports = {
               };
     return rp(common.createPostOptions(url,qs));
   },
+  */
   "getGroupPrivacyOpen": () => { return "OPEN"; },
   "getGroupPrivacyClosed": () => { return "CLOSED"; },
   "getGroupPrivacySecret": () => { return "SECRET"; },

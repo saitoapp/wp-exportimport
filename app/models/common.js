@@ -3,26 +3,61 @@ var config = require("../../config/config.js"),
     request = require("request-promise");
 
 module.exports = {
-    
-    "__getAllData": function __getAllData(options, data) {
+
+  "__getAllData": function __getAllData(options, data) {
     let deferred = Promise.defer();
     request(options).then(res => {
       var response = JSON.parse(res);
-      
+
       data = data.concat(response.data);
       if (response.paging && response.paging.next){
-          options.url = response.paging.next;
-          __getAllData(options, data)
+        options.url = response.paging.next;
+        __getAllData(options, data)
           .then(function() {
-              deferred.resolve(data);
+            deferred.resolve(data);
           });
       } else {
-          deferred.resolve(data);
+        deferred.resolve(data);
       }
     }).catch(err => {
       deferred.reject(err);
     });
     return deferred.promise;
+  },
+  "__getAllSCIMData": function getAllSCIMData(options, data) {
+    let deferred = Promise.defer();
+    //console.log(JSON.stringify(options));
+    request(options).then(res => {
+      var response = JSON.parse(res);
+
+      data = data.concat(response.data);
+      if (response.startIndex + response.itemsPerPage < response.totalResults){
+        options.qs.startIndex = response.startIndex + response.itemsPerPage;
+        __getAllData(options, data)
+          .then(function() {
+            deferred.resolve(data);
+          });
+      } else {
+        deferred.resolve(data);
+      }
+    }).catch(err => {
+      deferred.reject(err);
+    });
+    return deferred.promise;
+  },
+  "createGetSCIMOptions": function createGetSCIMOptions(url, index){
+    return {
+      url: url,
+      qs: {
+        startIndex: index,
+        limit: 500,
+      },
+      headers: {
+        "Authorization": config.page_access_token,
+        "Content-Type": "application/json",
+      },
+      method: "GET",
+    };
   },
   "createGetOptions": function createGetOptions(url, fields){
     return {

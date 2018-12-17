@@ -14,6 +14,7 @@ module.exports = {
     return [
       "id",
       "cover",
+      "purpose",
       "description",
       "icon",
       "is_workplace_default",
@@ -82,9 +83,8 @@ module.exports = {
   "getAllModerators": function getAllModerators(id, fields) {
     let url = graphAPIUrl + id + "/moderators";
     return member.getEdgeMembers(url, fields);
-  }, 
+  },
 
-  // Cover cannot be changed after changed by the user
   "updateGroup": function updateGroup(id, name, description) {
     let url = graphAPIUrl + id;
     let qs =  {
@@ -123,7 +123,14 @@ module.exports = {
   "demoteMemberToAdmin": function demoteMemberToAdmin(id, memberId) {
     let url = graphAPIUrl + id + "/admins/" +  memberId;
     return rp(common.createDeleteOptions(url,null));
-  },  
+  },
+  "updateCover": function updateCover(id, imgurl) {
+    let url = graphAPIUrl + id;
+    let qs =  {
+      "cover_url": imgurl,
+    };
+    return rp(common.createPostOptions(url, qs));
+  },
   "post": function post(id, message, link, isMarkdown) {
     let url = graphAPIUrl + id + "/feed";
     let qs =  {

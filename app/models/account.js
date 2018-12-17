@@ -1,6 +1,7 @@
 
 var rp = require("request-promise"),
-    config = require("../../config/config.js");
+    config = require("../../config/config.js"),
+    common = require("./common.js");
 
 var scimApi = rp.defaults({
   baseUrl: "https://www.facebook.com/scim/v1/Users",
@@ -10,10 +11,78 @@ var scimApi = rp.defaults({
     "User-Agent": "wp-xplat-cli",
   },
 });
+var graphApi = rp.defaults({
+  baseUrl: "https://graph.facebook.com/",
+  headers: {
+    "Authorization": config.page_access_token,
+    "Content-Type": "application/json",
+    "User-Agent": "wp-xplat-cli",
+  },
+});
 
 module.exports = {
 
+  "__getAllData": function __getAllData(options, data) {
+    let deferred = Promise.defer();
+    request(options).then(res => {
+      var response = JSON.parse(res);
 
+      data = data.concat(response.data);
+      if (response.paging && response.paging.next){
+        options.url = response.paging.next;
+        __getAllData(options, data)
+          .then(function() {
+            deferred.resolve(data);
+          });
+      } else {
+        deferred.resolve(data);
+      }
+    }).catch(err => {
+      deferred.reject(err);
+    });
+    return deferred.promise;
+  },
+  /*
+  "getAllUsers": function getAllUsers(index, data) {
+    //let users = [];
+    //return common.__getAllSCIMData(common.createGetSCIMOptions("https://www.facebook.com/scim/v1/Users", 1), users);
+
+    let deferred = Promise.defer();
+
+    let options = {
+      url: "/",
+      qs: {
+        "startIndex": index,
+      },
+    };
+
+    // API Call
+    scimApi(options)
+      .then(responseraw => {
+        let response = JSON.parse(responseraw);
+        let newindex = response.startIndex + response.itemsPerPage;
+
+        console.log("NEW INDEX: " + newindex);
+        //console.log("RESOURCES: " + response.Resources);
+
+        data = data.concat(response.Resources);
+
+        console.log(data.length);
+
+        if(newindex < response.totalResults) {
+          getAllUsers(newindex, data)
+            .then(function() {
+              deferred.resolve(data);
+            });
+        } else {
+          deferred.resolve(data);
+        }
+      }).catch(err => {
+      deferred.reject(err);
+    });
+    return deferred.promise;
+  },
+  */
   "getUserByEmail": function getUserByEmail(email) {
     let options = {
       url: "/",
@@ -22,6 +91,30 @@ module.exports = {
       },
     };
     return scimApi(options);
+  },
+  "getUserById": function getUserById(id) {
+    let options = {
+      url: "/" + id,
+      qs: {
+      },
+    };
+    return scimApi(options);
+  },
+  "createUser": function createUser(user) {
+    let options = {
+      url: "/",
+      method: "POST",
+    };
+    options.body = JSON.stringify(user);
+    return scimApi(options);
+  },
+  "getUserPicture": function getUserPicture(id, size) {
+    let options = {
+      url: "/" + id + "/picture?type=" + size + "&redirect=false",
+      qs: {
+      },
+    };
+    return graphApi(options);
   },
   "updateUserEmail": function updateUserEmail(originalEmail, updatedEmail) {
     return this.getUserByEmail(originalEmail).then(user => {
@@ -92,6 +185,60 @@ module.exports = {
       throw error;
     });
   },
+  /*
+  "updateUserPhoto": function updateUserPhoto(id, url) {
+    return this.getUserById(id).then(user => {
+      let newUser = JSON.parse(user).Resources[0];
+      if (!newUser){
+        throw new Error("Could not find " + id);
+      }
+      let options = {
+        url: "/" + newUser.id,
+        method: "PUT",
+      };
+
+      let photo = `
+          {
+            "value": "` + url + `",
+            "type": "profile",
+            "primary": true
+          },`;
+      photo = JSON.parse(photo);
+      newUser.photos.push(photo);
+      options.body = JSON.stringify(newUser);
+      return scimApi(options);
+    }).catch(error => {
+      throw error;
+    });
+  },
+
+
+  "getUsersManagerList": function getUsersManagerList(importname) {
+    return this.getUserById(id).then(user => {
+      let newUser = JSON.parse(user).Resources[0];
+      if (!newUser){
+        throw new Error("Could not find " + id);
+      }
+      let options = {
+        url: "/" + newUser.id,
+        method: "PUT",
+      };
+
+      let photo = `
+          {
+            "value": "` + url + `",
+            "type": "profile",
+            "primary": true
+          },`;
+      photo = JSON.parse(photo);
+      newUser.photos.push(photo);
+      options.body = JSON.stringify(newUser);
+      return scimApi(options);
+    }).catch(error => {
+      throw error;
+    });
+  },
+  */
   "updateUserManager": function updateUserManager(email, manager_email) {
     return this.getUserByEmail(email).then(user => {
       let newUser = JSON.parse(user).Resources[0];
@@ -118,6 +265,41 @@ module.exports = {
           options.body = JSON.stringify(newUser);
           return scimApi(options);  
         });
+      }
+    });
+  },
+  "updateUserManagerByid": function updateUserManagerByid(id, manager_id) {
+    return this.getUserById(id).then(user => {
+      let newUser = JSON.parse(user);
+      if (!newUser){
+        throw new Error("Could not find user" + id);
+      }
+
+      this.getUserById(manager_id).then(m => {
+        let newManager = JSON.parse(m);
+        if (!newManager){
+          throw new Error("Could not find manager" + id);
+        }
+      });
+
+      if (newUser["urn:scim:schemas:extension:enterprise:1.0"]) {
+        newUser["urn:scim:schemas:extension:enterprise:1.0"].manager = {"managerId": manager_id};
+        let options = {
+          url: "/" + newUser.id,
+          method: "PUT",
+        };
+        options.body = JSON.stringify(newUser);
+        return scimApi(options);
+      } else {
+        let managerjson = "{ \"manager\": { \"managerId\": " + manager_id + "}}";
+        let manager = JSON.parse(managerjson);
+        newUser["urn:scim:schemas:extension:enterprise:1.0"] = manager;
+        let options = {
+          url: "/" + newUser.id,
+          method: "PUT",
+        };
+        options.body = JSON.stringify(newUser);
+        return scimApi(options);
       }
     });
   },
