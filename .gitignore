@@ -43,3 +43,6 @@ terraform
 # Various
 public/components
 .sass-cache
+
+# webstorm
+.idea

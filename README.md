@@ -2,10 +2,11 @@
 
 Right now this CLI only supports changing a user e-mail, but additional features will be available in the future.
 
-## Limitations:
+## Important:
 
 1. This tool will export all users and groups, except MCGs (Multi Company Groups).
 2. The "Default Group" information will be exported, but since this is a read-only group setting, it will not be imported. You need to set it manually as needed.
+3. If you are exporting users that are using SSO, don't forget to enable SSO on the target community before running this script.
 
 ## The basics
 

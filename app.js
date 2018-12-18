@@ -342,9 +342,11 @@ program
       }
 
       // For testing purposes, disable SSO
+      /*
       if(user_scim["urn:scim:schemas:extension:facebook:auth_method:1.0"].auth_method) {
         user_scim["urn:scim:schemas:extension:facebook:auth_method:1.0"].auth_method = "password";
       }
+      */
 
       // Delete OLD Access Code
       if(user_scim["urn:scim:schemas:extension:facebook:accountstatusdetails:1.0"].accessCode) {
