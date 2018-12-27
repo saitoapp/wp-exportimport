@@ -6,7 +6,7 @@
                 "request": "launch",
                 "name": "Launch Program",
                 "program": "${workspaceRoot}/app.js",
-                "args": ["update-locale", "scimagent-user24NEW@eduardogomes.net", "es_LA"],
+                "args": ["export-groups", "groups-copec"],
             },
             {
                 "type": "node",

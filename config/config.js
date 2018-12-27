@@ -14,6 +14,7 @@ var config = {
   port: process.env.PORT || '',
   page_access_token: process.env.PAGE_ACCESS_TOKEN || '',
   verify_token: process.env.VERIFY_TOKEN || '',
+  token_index: 1,
 };
 
 module.exports = config;

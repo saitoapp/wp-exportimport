@@ -109,13 +109,19 @@ module.exports = {
     return scimApi(options);
   },
   "getUserPicture": function getUserPicture(id, size) {
+    var _include_headers = function(body, response, resolveWithFullResponse) {
+      return {'headers': response.headers, 'data': body};
+    };
     let options = {
       url: "/" + id + "/picture?type=" + size + "&redirect=false",
       qs: {
       },
+      transform: _include_headers, 
     };
+    
     return graphApi(options);
   },
+  
   "updateUserEmail": function updateUserEmail(originalEmail, updatedEmail) {
     return this.getUserByEmail(originalEmail).then(user => {
       let newUser = JSON.parse(user).Resources[0];

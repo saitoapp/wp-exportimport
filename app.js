@@ -7,6 +7,10 @@ var config = require("./config/config"),
     fs = require("fs"),
     https = require("https");
 
+var RateLimiter = require('limiter').RateLimiter;
+var graphlimiter = new RateLimiter(1, 100);
+var picturelimiter = new RateLimiter(1, 500);
+
 program
 .version("0.0.1")
 .command("update-email <email> <newEmail>")
@@ -175,50 +179,50 @@ program
     console.log("About to export all users to " + exportname);
 
     let users = [];
-    /*
-    account.getAllUsers(1, users)
-      .then(users => {
-        console.log("USERS: " + users.length);
-      });
-      */
 
+    let basedir = "./" + exportname;
+      if (!fs.existsSync(basedir)){
+        fs.mkdirSync(basedir);
+      }
+      if (!fs.existsSync(basedir + "/users")){
+        fs.mkdirSync(basedir + "/users");
+      }
+      let picturedir = "./" + exportname + "/users/pictures";
+      if (!fs.existsSync(picturedir)){
+        fs.mkdirSync(picturedir);
+      }
     community.getAllMembers(member.getAvailableMemberFields())
       .then(users => {
-        // Create folders
-        let basedir = "./" + exportname;
-        if (!fs.existsSync(basedir)){
-          fs.mkdirSync(basedir);
-        }
-        if (!fs.existsSync(basedir + "/users")){
-          fs.mkdirSync(basedir + "/users");
-        }
-        let picturedir = "./" + exportname + "/users/pictures";
-        if (!fs.existsSync(picturedir)){
-          fs.mkdirSync(picturedir);
-        }
-
         // Get user info
         users.forEach(u => {
-          account.getUserById(u.id)
-            .then(userscim => {
-              fs.writeFile(basedir + "/users/user_" + u.id + "_scim.json", userscim, (err) => {
-                if (err) throw err;
-                //console.log('SUCCESS exporting users (SCIM) to ' + exportname);
-              });
-            });
-          if (u.picture.data.url) {
-            // Get large picture
-            account.getUserPicture(u.id, "large")
-              .then(picture => {
-                //console.log("Picture: " + picture);
-                picture = JSON.parse(picture);
-                let fextension = picture.data.url.match(/\.(png|jpg)/gi);
-                let file = fs.createWriteStream(picturedir + "/" + u.id + fextension);
-                https.get(picture.data.url, function(response) {
-                  response.pipe(file);
+          graphlimiter.removeTokens(1, function() {
+            account.getUserById(u.id)
+              .then(userscim => {
+                fs.writeFile(basedir + "/users/user_" + u.id + "_scim.json", userscim, (err) => {
+                  if (err) throw err;
+                  //console.log('SUCCESS exporting users (SCIM) to ' + exportname);
                 });
               });
-          }
+            });
+            if (u.picture.data.url) {
+              picturelimiter.removeTokens(1, function() {
+                // Get large picture
+                account.getUserPicture(u.id, "large")
+                  .then(picture => {
+                    var xappusage = JSON.parse(picture.headers['x-app-usage']);
+                    if (xappusage.call_count > 90 || xappusage.total_time > 90){
+                      config.token_index = config.token_index + 1;
+                      config.page_access_token = process.env['PAGE_ACCESS_TOKEN' + config.token_index];
+                    }
+                    picture = JSON.parse(picture.data);
+                    let fextension = picture.data.url.match(/\.(png|jpg)/gi);
+                    let file = fs.createWriteStream(picturedir + "/" + u.id + fextension);
+                    https.get(picture.data.url, function(response) {
+                      response.pipe(file);
+                    });
+                  });
+                });
+            }
         });
 
         // Save to file

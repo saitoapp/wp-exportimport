@@ -4,6 +4,9 @@ var common = require("./common.js"),
     config = require("../../config/config.js"),
     request = require("request-promise");
 
+var async = require('asyncawait/async');
+var await = require('asyncawait/await');
+
 const graphAPIUrl = "https://graph.facebook.com/v2.6/";
 
 module.exports = {
@@ -39,9 +42,28 @@ module.exports = {
     if (fields.constructor !== Array) {
       fields = this.getDefaultMemberFields();
     }    
-    let members = [];
 
-    return common.__getAllData(common.createGetOptions(url, fields), members);
+    var result = async (function() {
+      let members = [];
+      hasNext = true;
+
+      while (hasNext) {
+          var promise = new Promise(resolve => {
+            request(common.createGetOptions(url, fields)).then(res => {
+              members.concat(response.data);
+              if (!response.paging.next) {
+                hasNext = false;
+              } else {
+                  apiCall = response.paging.next;
+              }
+              resolve();
+            });
+        });
+      }
+      return members;
+    });
+    //return common.__getAllData(common.createGetOptions(url, fields), members);
+    return result.promise;
   }, 
 
   "getAllEvents": function getAllEvents(id, fields) {
