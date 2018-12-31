@@ -22,6 +22,7 @@ module.exports = {
   },
   
   "getAllMembers": function getAllMembers(fields) {
+    // Get all members
     let url = graphAPIUrl + "community/members";
     var members = [];
     var hasNext = true;

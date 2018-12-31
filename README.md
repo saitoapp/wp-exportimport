@@ -49,8 +49,10 @@ PAGE_ACCESS_TOKEN=Bearer <access token, created on step 6 in the format "Bearer 
 
 ```
     node app.js export-users <exportname>
+    node app.js export-users-checkresync <exportname>
     node app.js export-groups <exportname>
-    node import-users <importname> <imgpublicrepo>
-    node update-managers <importname>
-    node import-groups <importname> <imgpublicrepo>
+    node app.js import-users <importname> <imgpublicrepo>
+    node app.js update-managers <importname>
+    node app.js import-groups <importname> <imgpublicrepo>
+    node app.js delete-users-entitledtodeletion
 ```

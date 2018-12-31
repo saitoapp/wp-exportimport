@@ -12,7 +12,7 @@ module.exports = {
       data = data.concat(response.data);
       if (response.paging && response.paging.next){
         options.url = response.paging.next;
-        __getAllData(options, data)
+        return __getAllData(options, data)
           .then(function() {
             deferred.resolve(data);
           });
@@ -46,39 +46,42 @@ module.exports = {
     return deferred.promise;
   },
   "createGetSCIMOptions": function createGetSCIMOptions(url, index){
+    let page_access_token = this.getToken();
     return {
       url: url,
       qs: {
         startIndex: index,
-        limit: 500,
+        limit: 50000,
       },
       headers: {
-        "Authorization": config.page_access_token,
+        "Authorization": page_access_token,
         "Content-Type": "application/json",
       },
       method: "GET",
     };
   },
   "createGetOptions": function createGetOptions(url, fields){
+    let page_access_token = this.getToken();
     return {
       url: url,
       qs: {
         fields: fields.join(),
-        limit: 500,
+        limit: 50000,
       },
       headers: {
-        "Authorization": config.page_access_token,
+        "Authorization": page_access_token,
         "Content-Type": "application/json",
       },
       method: "GET",
     };
   },
   "createPostOptions": function createPostOptions(url, qs){
+    let page_access_token = this.getToken();
     return {
       url: url,
       qs: qs,
       headers: {
-        "Authorization": config.page_access_token,
+        "Authorization": page_access_token,
         "Content-Type": "application/json",
         "User-Agent": "wp-xplat-cli",
       },
@@ -86,11 +89,12 @@ module.exports = {
     };
   },
   "createPutOptions": function createPutOptions(url, qs){
+    let page_access_token = this.getToken();
     return {
       url: url,
       qs: qs,
       headers: {
-        "Authorization": config.page_access_token,
+        "Authorization": page_access_token,
         "Content-Type": "application/json",
         "User-Agent": "wp-xplat-cli",
       },
@@ -98,11 +102,12 @@ module.exports = {
     };
   },
   "createDeleteOptions": function createDeleteOptions(url, qs){
+    let page_access_token = this.getToken();
     return {
       url: url,
       qs: qs,
       headers: {
-        "Authorization": config.page_access_token,
+        "Authorization": page_access_token,
       },
       method: "DELETE",
     };
@@ -121,12 +126,21 @@ module.exports = {
       },
     };
     return request(options, function(error, response) {
-          if(error) {
-              console.log("Error sending messages: ", error);
-          }
-          else if(response.body.error) {
-              console.log("Error: ", response.body.error);
-          }
-      });
+        if(error) {
+            console.log("Error sending messages: ", error);
+        }
+        else if(response.body.error) {
+            console.log("Error: ", response.body.error);
+        }
+    });
+  },
+  "getToken": function getToken(){
+    if(config.token_index === config.token_total) {
+      config.token_index = 2;
+    } else {
+      config.token_index = config.token_index + 1;
+    }
+    //console.log("USING TOKEN " + config.token_index);
+    return process.env['PAGE_ACCESS_TOKEN' + config.token_index];
   },
 };

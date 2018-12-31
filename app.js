@@ -5,11 +5,13 @@ var config = require("./config/config"),
     community = require("./app/models/community"),
     program = require("commander"),
     fs = require("fs"),
-    https = require("https");
+    https = require("https"),
+    glob = require("glob");
 
 var RateLimiter = require('limiter').RateLimiter;
 var graphlimiter = new RateLimiter(1, 100);
-var picturelimiter = new RateLimiter(1, 500);
+var picturelimiter = new RateLimiter(1, 1000);
+var scimlimiter = new RateLimiter(1, 100);
 
 program
 .version("0.0.1")
@@ -173,6 +175,19 @@ program
 });
 program
   .version("0.0.1")
+  .command("update-active <email> <enable>")
+  .description("Activate or deactivate an user")
+  .action(function(email, enable){
+    console.log("About to change active status for user " + email + " to " + enable);
+    account.updateUserActive(email, enable)
+      .then(user => {
+        console.log("SUCCESS changing active status for user " +  email + " to " + enable);
+      }).catch(error=>{
+      console.log("ERROR changing active status for user " +  email + " to " + enable + "Error: " + error);
+    });
+  });
+program
+  .version("0.0.1")
   .command("export-users <exportname>")
   .description("Export all users and their profile photos")
   .action(function(exportname){
@@ -200,7 +215,7 @@ program
               .then(userscim => {
                 fs.writeFile(basedir + "/users/user_" + u.id + "_scim.json", userscim, (err) => {
                   if (err) throw err;
-                  //console.log('SUCCESS exporting users (SCIM) to ' + exportname);
+                  console.log("SUCCESS exporting user scim " + u.id + " to " + exportname);
                 });
               });
             });
@@ -210,15 +225,45 @@ program
                 account.getUserPicture(u.id, "large")
                   .then(picture => {
                     var xappusage = JSON.parse(picture.headers['x-app-usage']);
+                    // Linear mode Edu
+                    /*
                     if (xappusage.call_count > 90 || xappusage.total_time > 90){
                       config.token_index = config.token_index + 1;
                       config.page_access_token = process.env['PAGE_ACCESS_TOKEN' + config.token_index];
+                      console.log("TOKEN LIMIT EXCEEDED!!! MOVING TO  " + config.token_index);
                     }
+                    */
+
+                    // Linear mode
+                    /*
+                    if (xappusage.call_count > 90 || xappusage.total_time > 90){
+                      config.token_index = config.token_index + 1;
+                      config.page_access_token = process.env['PAGE_ACCESS_TOKEN' + config.token_index];
+                      console.log("TOKEN LIMIT EXCEEDED!!! MOVING TO  " + config.token_index);
+                    }
+                    */
+
+                    // Random mode
+                    /*
+                    if (xappusage.call_count > 90 || xappusage.total_time > 90){
+                      console.log("TOKEN LIMIT EXCEEDED!!! Call Count: " + xappusage.call_count + "Total time: " + xappusage.total_time);
+                    }
+                    if(config.token_index === 6) {
+                      config.token_index = 2;
+                    } else {
+                      config.token_index = config.token_index + 1;
+                    }
+                    config.page_access_token = process.env['PAGE_ACCESS_TOKEN' + config.token_index];
+                    console.log("USING TOKEN " + config.token_index + " TO GET IMAGE = " + config.page_access_token);
+                    */
+
                     picture = JSON.parse(picture.data);
                     let fextension = picture.data.url.match(/\.(png|jpg)/gi);
                     let file = fs.createWriteStream(picturedir + "/" + u.id + fextension);
                     https.get(picture.data.url, function(response) {
-                      response.pipe(file);
+                      if(response.pipe(file)) {
+                        console.log("SUCCESS saving user's picture " + u.id + " to " + exportname);
+                      }
                     });
                   });
                 });
@@ -235,6 +280,60 @@ program
       console.log("ERROR exporting all users to " +  exportname + " Error: " + error);
     });
 
+  });
+program
+  .version("0.0.1")
+  .command("export-users-checkresync <exportname>")
+  .description("Show how many users we have exported and if scim/picture are ok.")
+  .action(function(exportname){
+    console.log("About to check many users we have exported and resync scim/picture if necessary on " + exportname);
+
+    let basedir = "./" + exportname;
+    let picturedir = "./" + exportname + "/users/pictures";
+
+    // Get users
+    let filecontent = fs.readFileSync(basedir + "/users/users.json", "utf8");
+    let users = JSON.parse(filecontent);
+    console.log("There are " + users.length + " exported. Checking if scim/pictures are ok.");
+    for(let i=0; i<users.length; i++) {
+      // Check scim
+      glob(basedir + "/users/user_" + users[i].id + "_scim.json", function (er, files) {
+        if (files.length === 0) {
+          graphlimiter.removeTokens(1, function() {
+            account.getUserById(users[i].id)
+              .then(userscim => {
+                fs.writeFile(basedir + "/users/user_" + users[i].id + "_scim.json", userscim, (err) => {
+                  if (err) throw err;
+                  console.log("SUCCESS exporting user scim " + users[i].id + " to " + exportname);
+                });
+              });
+          });
+        }
+      });
+
+      // Check picture
+      if (users[i].picture.data.url) {
+        glob(picturedir + "/" + users[i].id + ".*", function (er, files) {
+          if (files.length === 0) {
+            //console.log(users[i].id);
+            picturelimiter.removeTokens(1, function () {
+              // Get large picture
+              account.getUserPicture(users[i].id, "large")
+                .then(picture => {
+                  picture = JSON.parse(picture.data);
+                  let fextension = picture.data.url.match(/\.(png|jpg)/gi);
+                  let file = fs.createWriteStream(picturedir + "/" + users[i].id + fextension);
+                  https.get(picture.data.url, function (response) {
+                    if(response.pipe(file)) {
+                      console.log("SUCCESS saving user's picture " + users[i].id + " to " + exportname);
+                    }
+                  });
+                });
+            });
+          }
+        });
+      }
+    }
   });
 program
   .version("0.0.1")
@@ -289,22 +388,24 @@ program
             });
             */
           // Get members
-          group.getAllMembers(g.id, "")
-            .then(members => {
-              //console.log('Members for group ' + g.id + ' are ' + JSON.stringify(members));
-              let groupsmembers_json = JSON.stringify(members);
-              fs.writeFile(basedir + "/groups/" + g.id + "_members.json", groupsmembers_json, (err) => {
-                if (err) throw err;
-                //console.log('SUCCESS exporting groups members to folder ' + exportname);
+          graphlimiter.removeTokens(1, function() {
+            group.getAllMembers(g.id, "")
+              .then(members => {
+                //console.log('Members for group ' + g.id + ' are ' + JSON.stringify(members));
+                let groupsmembers_json = JSON.stringify(members);
+                fs.writeFile(basedir + "/groups/" + g.id + "_members.json", groupsmembers_json, (err) => {
+                  if (err) throw err;
+                  console.log("SUCCESS exporting group " + g.name + " with " + members.length + " members.");
+                });
               });
-            });
+          });
         });
 
         // Save to file
         var groups_json = JSON.stringify(groups);
         fs.writeFile(basedir + "/groups/groups.json", groups_json, (err) => {
           if (err) throw err;
-          console.log("SUCCESS exporting groups to folder " + exportname);
+          //console.log("SUCCESS exporting groups to folder " + exportname);
         });
       }).catch(error=>{
       console.log("ERROR exporting all groups to " +  exportname + " Error: " + error);
@@ -323,68 +424,90 @@ program
     console.log("About to import all users from " + importname);
     let basedir = "./" + importname;
 
-    // Get users
-    let filecontent = fs.readFileSync(basedir + "/users/users.json", "utf8");
-    let users = JSON.parse(filecontent);
-    for(let i=0; i<users.length; i++) {
-      //console.log(i + " USER: " + JSON.stringify(users[i]));
-
-      // Get User SCIM
-      let filecontent = fs.readFileSync(basedir + "/users/user_" + users[i].id + "_scim.json", "utf8");
-      let user_scim = JSON.parse(filecontent);
-      delete user_scim.id;
-      //delete user_scim.externalId;
-
-      // Username change
-      if(user_scim.userName) {
-        user_scim.userName = user_scim.userName + ".changeme2";
-      }
-
-      // External ID change (email-less unclaimed)
-      if(user_scim.externalId) {
-        user_scim.externalId = user_scim.externalId + ".changeme2";
-      }
-
-      // For testing purposes, disable SSO
-      /*
-      if(user_scim["urn:scim:schemas:extension:facebook:auth_method:1.0"].auth_method) {
-        user_scim["urn:scim:schemas:extension:facebook:auth_method:1.0"].auth_method = "password";
-      }
-      */
-
-      // Delete OLD Access Code
-      if(user_scim["urn:scim:schemas:extension:facebook:accountstatusdetails:1.0"].accessCode) {
-        delete user_scim["urn:scim:schemas:extension:facebook:accountstatusdetails:1.0"].accessCode;
-        delete user_scim["urn:scim:schemas:extension:facebook:accountstatusdetails:1.0"].accessCodeExpirationDate;
-      }
-
-      // Add picture
-      let fextension = users[i].picture.data.url.match(/\.(png|jpg)/gi);
-      let photo = "{ \"value\": \"" + imgpublicrepo + "/" + users[i].id + fextension + "\",\"type\": \"profile\", \"primary\": true }";
-      photo = JSON.parse(photo);
-      user_scim.photos= [];
-      user_scim.photos.push(photo);
-      //console.log(JSON.stringify(user_scim));
-
-      // Create user
-      account.createUser(user_scim)
-        .then(user => {
-          // Save new file the the new account
-          fs.writeFile(basedir + "/users/user_" + users[i].id + "_new_scim.json", user, (err) => {
-            if (err) throw err;
-            //console.log("SUCCESS exporting groups to folder " + exportname);
-          });
+    community.getAllMembers(member.getAvailableMemberFields())
+      .then(existingusers => {
+        let existingUsersArray = [];
+        existingusers.forEach(u => {
+          existingUsersArray[u.email] = u.id;
         });
 
-      // Update picture
-      /*
-      let fextension = users[i].picture.data.url.match(/\.(png|jpg)/gi);
-      account.updateUserPhoto(user.id, imgpublicrepo + "/" + users[i] + fextension)
-        .catch(error=>{
-          console.log("ERROR updating picture of user " +  user.id + " Error: " + error);
-        });
-        */
-    }
+        // Get exported users
+        let filecontent = fs.readFileSync(basedir + "/users/users.json", "utf8");
+        let users = JSON.parse(filecontent);
+        for(let i=0; i<users.length; i++) {
+          //console.log(i + " USER: " + JSON.stringify(users[i]));
+
+          // Get User SCIM
+          let filecontent = fs.readFileSync(basedir + "/users/user_" + users[i].id + "_scim.json", "utf8");
+          let user_scim = JSON.parse(filecontent);
+          delete user_scim.id;
+          //delete user_scim.externalId;
+
+          // Username change
+          if(user_scim.userName) {
+            user_scim.userName = user_scim.userName + ".changeme3";
+          }
+
+          // External ID change (email-less unclaimed)
+          if(user_scim.externalId) {
+            user_scim.externalId = user_scim.externalId + ".changeme3";
+          }
+
+          // For testing purposes, disable SSO
+          /*
+          if(user_scim["urn:scim:schemas:extension:facebook:auth_method:1.0"].auth_method) {
+            user_scim["urn:scim:schemas:extension:facebook:auth_method:1.0"].auth_method = "password";
+          }
+          */
+
+          // Set claimed and Invited to false
+          if(user_scim["urn:scim:schemas:extension:facebook:accountstatusdetails:1.0"].claimed) {
+            user_scim["urn:scim:schemas:extension:facebook:accountstatusdetails:1.0"].claimed = false;
+          }
+          if(user_scim["urn:scim:schemas:extension:facebook:accountstatusdetails:1.0"].invited) {
+            user_scim["urn:scim:schemas:extension:facebook:accountstatusdetails:1.0"].invited = false;
+          }
+
+          // Delete OLD Access Code
+          if(user_scim["urn:scim:schemas:extension:facebook:accountstatusdetails:1.0"].accessCode) {
+            delete user_scim["urn:scim:schemas:extension:facebook:accountstatusdetails:1.0"].accessCode;
+            delete user_scim["urn:scim:schemas:extension:facebook:accountstatusdetails:1.0"].accessCodeExpirationDate;
+          }
+
+          // Add picture
+          let fextension = users[i].picture.data.url.match(/\.(png|jpg)/gi);
+          let photo = "{ \"value\": \"" + imgpublicrepo + "/" + users[i].id + fextension + "\",\"type\": \"profile\", \"primary\": true }";
+          photo = JSON.parse(photo);
+          user_scim.photos= [];
+          user_scim.photos.push(photo);
+          //console.log(JSON.stringify(user_scim));
+
+          // Create user
+          /*
+          if(user_scim.userName) {
+            console.log("user_scim.userName: " + user_scim.userName + ", typeof existingUsersArray[user_scim.userName]: " + typeof existingUsersArray[user_scim.userName]);
+          }
+          */
+
+          if(typeof existingUsersArray[user_scim.userName] === "undefined") {
+            scimlimiter.removeTokens(1, function () {
+              account.createUser(user_scim)
+                .then(user => {
+                  // Save new file the the new account
+                  fs.writeFile(basedir + "/users/user_" + users[i].id + "_new_scim.json", user, (err) => {
+                    if (err) throw err;
+                    console.log("SUCCESS importing user " + users[i].id);
+                  });
+                }).catch(error => {
+                console.log("ERROR while importing user " + users[i].id + " Error: " + error);
+              });
+            });
+          } else {
+            console.log("User already exists: " + user_scim.userName);
+          }
+
+        }
+      });
   });
 program
   // Checklist
@@ -430,11 +553,13 @@ program
         //console.log("New manager: " + JSON.stringify(manager) + " for user " + userid);
 
         // Update
-        account.updateUserManagerByid(userid, manager)
-          .then(user => {
-            console.log("SUCCESS updating manager of " +  userid + " to " + manager);
-          }).catch(error=>{
-            console.log("ERROR updating manager of " +  userid + " to " + manager + " Error: " + error);
+        scimlimiter.removeTokens(1, function () {
+          account.updateUserManagerByid(userid, manager)
+            .then(user => {
+              console.log("SUCCESS updating manager of " + userid + " to " + manager);
+            }).catch(error => {
+            console.log("ERROR updating manager of " + userid + " to " + manager + " Error: " + error);
+          });
         });
       }
     }
@@ -471,49 +596,82 @@ program
       //console.log(i + " GROUP: " + JSON.stringify(groups[i]));
 
       // Create Group
-      community.createNewGroup(groups[i])
-        .then(newgroup => {
-          newgroup = JSON.parse(newgroup);
-          groups[i].newid = newgroup.id;
-          console.log("SUCCESS creating group " + groups[i].newid + ", old ID was " + groups[i].id);
+      scimlimiter.removeTokens(1, function () {
+        community.createNewGroup(groups[i])
+          .then(newgroup => {
+            newgroup = JSON.parse(newgroup);
+            groups[i].newid = newgroup.id;
+            console.log("SUCCESS creating group " + groups[i].newid + ", old ID was " + groups[i].id);
 
-          // Add Image
-          if (groups[i].cover && groups[i].cover.source) {
-            let fextension = groups[i].cover.source.match(/\.(png|jpg)/gi);
-            let imgfilename = imgpublicrepo + "/" + groups[i].id + "_cover" + fextension;
+            // Add Image
+            if (groups[i].cover && groups[i].cover.source) {
+              let fextension = groups[i].cover.source.match(/\.(png|jpg)/gi);
+              let imgfilename = imgpublicrepo + "/" + groups[i].id + "_cover" + fextension;
 
-            group.updateCover(groups[i].newid, imgfilename)
-              .then(img => {
-                console.log("SUCCESS updating cover of " + groups[i].newid + " to " + imgfilename);
-              }).catch(error => {
-                console.log("ERROR updating cover of " + groups[i].newid + " to " + imgfilename + " Error: " + error);
-            });
-          }
+              scimlimiter.removeTokens(1, function () {
+                group.updateCover(groups[i].newid, imgfilename)
+                  .then(img => {
+                    console.log("SUCCESS updating cover of " + groups[i].newid + " to " + imgfilename);
+                  }).catch(error => {
+                  console.log("ERROR updating cover of " + groups[i].newid + " to " + imgfilename + " Error: " + error);
+                });
+              });
+            }
 
-          // Add Members
-          filecontent = fs.readFileSync(basedir + "/groups/" + groups[i].id + "_members.json", "utf8");
-          let oldmembers = JSON.parse(filecontent);
-          for (let j = 0; j < oldmembers.length; j++) {
-            group.addMemberToGroupById(groups[i].newid, users_newscim[oldmembers[j].id])
-              .then(newmember => {
-                console.log("SUCCESS adding " + users_newscim[oldmembers[j].id] + " (OLD: " + oldmembers[j].id + ") to " + groups[i].newid);
-                // Promote admins
-                if (oldmembers[j].administrator) {
-                  group.promoteMemberToAdmin(groups[i].newid, users_newscim[oldmembers[j].id])
-                    .then(admin => {
-                      console.log("SUCCESS promoting " + users_newscim[oldmembers[j].id] + " (OLD: " + oldmembers[j].id + ") to ADMIN of " + groups[i].newid);
-                    }).catch(error => {
-                      console.log("ERROR promoting " + users_newscim[oldmembers[j].id] + " (OLD: " + oldmembers[j].id + ") to ADMIN of " + groups[i].newid + " Error: " + error);
-                  });
-                }
-              }).catch(error => {
-              console.log("ERROR adding " + users_newscim[oldmembers[j].id] + " (OLD: " + oldmembers[j].id + ") to " + groups[i].newid + " Error: " + error);
-            });
-          }
-        }).catch(error => {
+            // Add Members
+            filecontent = fs.readFileSync(basedir + "/groups/" + groups[i].id + "_members.json", "utf8");
+            let oldmembers = JSON.parse(filecontent);
+            for (let j = 0; j < oldmembers.length; j++) {
+              scimlimiter.removeTokens(1, function () {
+                group.addMemberToGroupById(groups[i].newid, users_newscim[oldmembers[j].id])
+                  .then(newmember => {
+                    console.log("SUCCESS adding " + users_newscim[oldmembers[j].id] + " (OLD: " + oldmembers[j].id + ") to " + groups[i].newid);
+                    // Promote admins
+                    if (oldmembers[j].administrator) {
+                      group.promoteMemberToAdmin(groups[i].newid, users_newscim[oldmembers[j].id])
+                        .then(admin => {
+                          console.log("SUCCESS promoting " + users_newscim[oldmembers[j].id] + " (OLD: " + oldmembers[j].id + ") to ADMIN of " + groups[i].newid);
+                        }).catch(error => {
+                        console.log("ERROR promoting " + users_newscim[oldmembers[j].id] + " (OLD: " + oldmembers[j].id + ") to ADMIN of " + groups[i].newid + " Error: " + error);
+                      });
+                    }
+                  }).catch(error => {
+                  console.log("ERROR adding " + users_newscim[oldmembers[j].id] + " (OLD: " + oldmembers[j].id + ") to " + groups[i].newid + " Error: " + error);
+                });
+              });
+            }
+          }).catch(error => {
           console.log("ERROR while creating a new group for (Old) " + groups[i].id + " Error: " + error);
+        });
       });
     }
+  });
+program
+  .version("0.0.1")
+  .command("delete-users-entitledtodeletion")
+  .description("Delete all users with canDelete flag.")
+  .action(function(){
+    console.log("About to delete all users with canDelete flag.");
+
+    community.getAllMembers(member.getAvailableMemberFields())
+      .then(users => {
+        // Get user info
+        users.forEach(u => {
+          graphlimiter.removeTokens(1, function() {
+            account.getUserById(u.id)
+              .then(userscim => {
+                userscim = JSON.parse(userscim);
+                if(userscim["urn:scim:schemas:extension:facebook:accountstatusdetails:1.0"] != undefined && userscim["urn:scim:schemas:extension:facebook:accountstatusdetails:1.0"].canDelete === true) {
+                    console.log("Deleting user " + userscim.id);
+                    account.deleteUserById(userscim.id);
+                }
+              });
+          });
+        });
+      }).catch(error=>{
+      console.log("ERROR deleting users. Error: " + error);
+    });
+
   });
 
 

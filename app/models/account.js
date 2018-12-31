@@ -101,22 +101,63 @@ module.exports = {
     return scimApi(options);
   },
   "createUser": function createUser(user) {
+    let page_access_token = common.getToken();
+
     let options = {
+      headers: {
+        "Authorization": page_access_token,
+        "Content-Type": "application/json",
+        "User-Agent": "wp-xplat-cli",
+      },
       url: "/",
       method: "POST",
     };
     options.body = JSON.stringify(user);
     return scimApi(options);
   },
+  "deleteUserById": function deleteUserById(id) {
+    let options = {
+      url: "/" + id,
+      method: "DELETE",
+    };
+    return scimApi(options);
+  },
   "getUserPicture": function getUserPicture(id, size) {
     var _include_headers = function(body, response, resolveWithFullResponse) {
       return {'headers': response.headers, 'data': body};
     };
+    /* default
     let options = {
       url: "/" + id + "/picture?type=" + size + "&redirect=false",
       qs: {
       },
       transform: _include_headers, 
+    };
+    */
+
+    // Round-robin LB of tokens
+    /*
+    if(config.token_index === config.token_total) {
+      config.token_index = 2;
+    } else {
+      config.token_index = config.token_index + 1;
+    }
+    let page_access_token = process.env['PAGE_ACCESS_TOKEN' + config.token_index];
+    console.log("USING TOKEN " + config.token_index);
+    */
+
+    let page_access_token = common.getToken();
+
+    let options = {
+      headers: {
+        "Authorization": page_access_token,
+        "Content-Type": "application/json",
+        "User-Agent": "wp-xplat-cli",
+      },
+      url: "/" + id + "/picture?type=" + size + "&redirect=false",
+      qs: {
+      },
+      transform: _include_headers,
     };
     
     return graphApi(options);
@@ -187,6 +228,28 @@ module.exports = {
       newUser['urn:scim:schemas:extension:facebook:auth_method:1.0'].auth_method = method;
       options.body = JSON.stringify(newUser);
       return scimApi(options);  
+    }).catch(error => {
+      throw error;
+    });
+  },
+  "updateUserActive": function updateUserActive(email, enable) {
+    return this.getUserByEmail(email).then(user => {
+      let newUser = JSON.parse(user).Resources[0];
+      if (!newUser){
+        throw new Error("Could not find " + email);
+      }
+      let options = {
+        url: "/" + newUser.id,
+        method: "PUT",
+      };
+      if(enable==="false") {
+        newUser.active = false;
+      } else {
+        newUser.active = true;
+      }
+
+      options.body = JSON.stringify(newUser);
+      return scimApi(options);
     }).catch(error => {
       throw error;
     });
@@ -290,7 +353,13 @@ module.exports = {
 
       if (newUser["urn:scim:schemas:extension:enterprise:1.0"]) {
         newUser["urn:scim:schemas:extension:enterprise:1.0"].manager = {"managerId": manager_id};
+        let page_access_token = common.getToken();
         let options = {
+          headers: {
+            "Authorization": page_access_token,
+            "Content-Type": "application/json",
+            "User-Agent": "wp-xplat-cli",
+          },
           url: "/" + newUser.id,
           method: "PUT",
         };
@@ -300,7 +369,13 @@ module.exports = {
         let managerjson = "{ \"manager\": { \"managerId\": " + manager_id + "}}";
         let manager = JSON.parse(managerjson);
         newUser["urn:scim:schemas:extension:enterprise:1.0"] = manager;
+        let page_access_token = common.getToken();
         let options = {
+          headers: {
+            "Authorization": page_access_token,
+            "Content-Type": "application/json",
+            "User-Agent": "wp-xplat-cli",
+          },
           url: "/" + newUser.id,
           method: "PUT",
         };

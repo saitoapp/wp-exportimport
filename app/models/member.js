@@ -39,13 +39,14 @@ module.exports = {
   },
 
   "getEdgeMembers": function getEdgeMembers(url, fields) {
+    /* Edu
     if (fields.constructor !== Array) {
       fields = this.getDefaultMemberFields();
     }    
 
     var result = async (function() {
       let members = [];
-      hasNext = true;
+      let hasNext = true;
 
       while (hasNext) {
           var promise = new Promise(resolve => {
@@ -64,6 +65,16 @@ module.exports = {
     });
     //return common.__getAllData(common.createGetOptions(url, fields), members);
     return result.promise;
+    */
+
+
+    if (fields.constructor !== Array) {
+      fields = this.getDefaultMemberFields();
+    }
+    let members = [];
+
+    return common.__getAllData(common.createGetOptions(url, fields), members);
+
   }, 
 
   "getAllEvents": function getAllEvents(id, fields) {
