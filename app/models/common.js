@@ -51,7 +51,7 @@ module.exports = {
       url: url,
       qs: {
         startIndex: index,
-        limit: 50000,
+        limit: 500,
       },
       headers: {
         "Authorization": page_access_token,
@@ -66,7 +66,7 @@ module.exports = {
       url: url,
       qs: {
         fields: fields.join(),
-        limit: 50000,
+        limit: 500,
       },
       headers: {
         "Authorization": page_access_token,
