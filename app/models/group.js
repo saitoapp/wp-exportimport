@@ -5,8 +5,10 @@ var member = require("./member.js"),
     album = require("./album.js"),
     doc = require("./doc.js"),
     post = require("./post.js"),
-    file = require("./file.js");
-
+    file = require("./file.js"),
+    request = require("request-promise");
+var async = require('asyncawait/async');
+var await = require('asyncawait/await');
 const graphAPIUrl = "https://graph.facebook.com/v2.6/";
 
 module.exports = {
@@ -76,8 +78,38 @@ module.exports = {
   },
 
   "getAllMembers": function getAllMembers(id, fields) {
+    /*
     let url = graphAPIUrl + id + "/members";
     return member.getEdgeMembers(url, fields);
+    */
+
+    // Get all members
+    let url = graphAPIUrl + id + "/members";
+    var members = [];
+    var hasNext = true;
+
+    var result = async (function() {
+      while (hasNext) {
+        await (new Promise(resolve => {
+            request(common.createGetOptions(url, fields)).then(res => {
+              var response = JSON.parse(res);
+              for(var i in response.data){
+                members.push(response.data[i]);
+              }
+              if (typeof response.paging === "undefined" || typeof response.paging.next === "undefined" || !response.paging.next) {
+                hasNext = false;
+              } else {
+                url = response.paging.next;
+              }
+              resolve();
+            });
+          })
+        );
+      }
+      return members;
+    });
+    //return common.__getAllData(common.createGetOptions(url, fields), members);
+    return result();
   },
 
   "getAllModerators": function getAllModerators(id, fields) {

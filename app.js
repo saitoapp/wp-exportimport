@@ -389,7 +389,8 @@ program
             */
           // Get members
           graphlimiter.removeTokens(1, function() {
-            group.getAllMembers(g.id, "")
+            let fields =[];
+            group.getAllMembers(g.id, fields)
               .then(members => {
                 //console.log('Members for group ' + g.id + ' are ' + JSON.stringify(members));
                 let groupsmembers_json = JSON.stringify(members);
@@ -459,6 +460,20 @@ program
             user_scim["urn:scim:schemas:extension:facebook:auth_method:1.0"].auth_method = "password";
           }
           */
+
+          // Set locale based on graph api locale settings, otherwise set it to es_LA
+          if(typeof user_scim.locale === "undefined" && typeof users[i].locale !== "undefined") {
+            user_scim["locale"] = users[i].locale;
+          } else {
+            user_scim["locale"]= "es_LA";
+          }
+
+          // Set preferredLanguage based on graph api locale settings, otherwise set it to es_LA
+          if(typeof user_scim.preferredLanguage === "undefined" && typeof users[i].locale !== "undefined") {
+            user_scim["preferredLanguage"] = users[i].locale;
+          } else {
+            user_scim["preferredLanguage"] = "es_LA";
+          }
 
           // Set claimed and Invited to false
           if(user_scim["urn:scim:schemas:extension:facebook:accountstatusdetails:1.0"].claimed) {
