@@ -35,7 +35,7 @@ module.exports = {
               for(var i in response.data){
                 members.push(response.data[i]);
               }
-              if (!response.paging.next) {
+              if (typeof response.paging === "undefined" || typeof response.paging.next === "undefined" || !response.paging.next) {
                 hasNext = false;
               } else {
                   url = response.paging.next;
