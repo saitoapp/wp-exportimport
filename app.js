@@ -525,6 +525,46 @@ program
       });
   });
 program
+// Checklist
+// - Make sure export files looks good
+// - Configure SSO
+// - Enable email-less
+// - Save images to a public website, like S3 Bucket
+  .version("0.0.1")
+  .command("resync-users-photo <importname> <imgpublicrepo>")
+  .description("Update users photo.")
+  .action(function(importname, imgpublicrepo){
+    console.log("About to update all users photos " + importname);
+    let basedir = "./" + importname;
+
+      // Get exported users
+      let filecontent = fs.readFileSync(basedir + "/users/users.json", "utf8");
+      let users = JSON.parse(filecontent);
+      for(let i=0; i<users.length; i++) {
+        //console.log(i + " USER: " + JSON.stringify(users[i]));
+
+        // Get User new SCIM
+        let filecontent = fs.readFileSync(basedir + "/users/user_" + users[i].id + "_new_scim.json", "utf8");
+        let user_scim = JSON.parse(filecontent);
+
+        // Update photo
+        let fextension = users[i].picture.data.url.match(/\.(png|jpg)/gi);
+        let photo = "{ \"value\": \"" + imgpublicrepo + "/" + users[i].id + fextension + "\",\"type\": \"profile\", \"primary\": true }";
+        photo = JSON.parse(photo);
+        user_scim.photos= [];
+        user_scim.photos.push(photo);
+
+        scimlimiter.removeTokens(1, function () {
+          account.updateUser(user_scim)
+            .then(user => {
+              console.log("SUCCESS updating photo for " + user_scim.id);
+            }).catch(error => {
+            console.log("ERROR updating photo for " + user_scim.id + "Error: " + error);
+          });
+        });
+      }
+  });
+program
   // Checklist
   // - Make sure export files looks good and users are indeed created on the new community.
   .version("0.0.1")

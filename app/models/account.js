@@ -162,7 +162,14 @@ module.exports = {
     
     return graphApi(options);
   },
-  
+  "updateUser": function updateUser(user) {
+    let options = {
+      url: "/" + user.id,
+      method: "PUT",
+    };
+    options.body = JSON.stringify(user);
+    return scimApi(options);
+  },
   "updateUserEmail": function updateUserEmail(originalEmail, updatedEmail) {
     return this.getUserByEmail(originalEmail).then(user => {
       let newUser = JSON.parse(user).Resources[0];
