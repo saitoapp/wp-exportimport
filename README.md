@@ -38,7 +38,7 @@ Right now this CLI only supports changing a user e-mail, but additional features
 3. Choose a relevant name and description for the app.
 4. Choose the required [permissions](https://developers.facebook.com/docs/workplace/integrations/custom-integrations/permissions) for the app, you will need the "Manage Accounts" and "Read Group Content" permission.
 5. Create, Copy and safely store the [access token](https://developers.facebook.com/docs/workplace/integrations/custom-integrations/permissions#appaccesstoken) that's shown to you. You'll need this when making API calls.
-6. Configure your environment variables. You will need to set the data on the ```.env``` file in your local wp-exportimport folder
+6. Configure your environment variables. You will need to set the data on the ```.env``` file in your local wp-exportimport folder. You need 15 tokens so we do not reach API requests limits.
 
 ```
 NODE_ENV=development
